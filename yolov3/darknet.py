@@ -29,4 +29,8 @@ def parse_cfg(cfg_file):
             block[key.rstrip()] = value.lstrip()
     blocks.append(block)
     return blocks
+###############test################
 
+blocks = parse_cfg("./cfg/yolov3.cfg")
+net_info = blocks[0]
+print(net_info)
