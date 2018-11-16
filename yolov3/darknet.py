@@ -4,6 +4,16 @@ import torch.nn.functional as F
 #from torch.autograd import Variable (deprecated)
 import numpy as np
 
+class EmptyLayer(nn.Module):
+    def __init__(self):
+        super(EmptyLayer, self).__init__()
+
+class DetectionLayer(nn.Module):
+    def __init__(self, anchors):
+        super(DetectionLayer, self).__init__()
+        self.anchors = anchors
+
+
 def parse_cfg(cfg_file):
     """
     Deal with cfg file
@@ -30,19 +40,24 @@ def parse_cfg(cfg_file):
     blocks.append(block)
     return blocks
 ############handles############
-def handle_upsample(block, 
+def handle_upsample(
+                block, 
                 index, 
                 net_info, 
-                module_list, 
-                prev_filters, 
-                output_filters):
-    print('handle_upsample')
+                output_filters,
+                module_list,
+                prev_filters
+                ):
+    stride = int(block["stride"])
+    upsample = nn.Upsample(scale_factor=stride, mode="bilinear")#this is 2
+    module_list.add_module("upsample_{}".format(index), upsample)
+
 def handle_convolutional(block, 
                 index, 
                 net_info, 
+                output_filters,
                 module_list, 
-                prev_filters, 
-                output_filters):
+                prev_filters):
     module = nn.Sequential()#each block may has muti layers
     activation = block["activation"]
     try:
@@ -67,37 +82,58 @@ def handle_convolutional(block,
 
     #add the batch norm layer
     if batch_normalize:
-        bn = nn.BatchNorm2d(filters)
+        bn = nn.BatchNorm2d(filters)# TODO what is batch norm????
         module.add_module("batch_norm_{0}".format(index), bn)
     #add the activation    
     if activation == "leaky":
         activn = nn.LeakyReLU(0.1, inplace=True)
         module.add_module("leaky_{0}".format(index), activn)
-    module_list.append(module)
     prev_filters[0] = filters
-    output_filters.append(filters)
+    module_list.append(module)
     
 def handle_route(block, 
                 index, 
                 net_info, 
+                output_filters,
                 module_list, 
-                prev_filters, 
-                output_filters):
-    print('handle_route')
+                prev_filters):
+    module = nn.Sequential()
+    block["layers"] = block["layers"].split(',')
+    start = int(block["layers"][0])
+    try:
+        end = int(block["layers"][1])
+    except:
+        end = 0
+    if start > 0:
+        start = start - index
+    if end > 0:
+        end = end - index
+    route = EmptyLayer()
+    module.add_module("route_{0}".format(index), route)
+    if end < 0:
+        prev_filters[0] = output_filters[index + start] + output_filters[index + end]
+    else:
+        prev_filters[0] = output_filters[index + start]
+    module_list.append(module)
+    
 def handle_shortcut(block, 
                 index, 
                 net_info, 
+                output_filters,
                 module_list, 
-                prev_filters, 
-                output_filters):
-    print('handle_shortcut')
+                prev_filters):
+    module = nn.Sequential()
+    shortcut = EmptyLayer()
+    module.add_module("shortcut_{}".format(index), shortcut)
+    module_list.append(module)
 def handle_yolo(block, 
                 index, 
                 net_info, 
+                output_filters,
                 module_list, 
-                prev_filters, 
-                output_filters):
-    print('handle_yolo')
+                prev_filters):
+    module = nn.Sequential()
+    
 block_handlers = {
 'convolutional':handle_convolutional,
 'upsample':handle_upsample,
@@ -120,21 +156,21 @@ def create_modules_from_blocks(blocks):
                     block, 
                     index, 
                     net_info, 
+                    output_filters,
                     module_list, 
-                    prev_filters, 
-                    output_filters)
+                    prev_filters)
+                
             except Exception as err:
                 print("call handler_", block_type, " has except:", err)
         else:
             print("has not handler_", block_type)
-        print("after handle_{0}".format(block_type), " pre_filters=",prev_filters, " output_filters=", output_filters)
-
-        #except:
-        #    print("no handle deal with:", block_type)
+        output_filters.append(prev_filters[0])
+    print("len of output_filters = ", len(output_filters))
+    return (net_info, module_list)
 ###############test################
+
 blocks = parse_cfg("./cfg/yolov3.cfg")
-net_info = blocks[0]
-print(net_info)
-print(block_handlers)
 print('-------------')
-create_modules_from_blocks(blocks)
+net_info , module_list = create_modules_from_blocks(blocks)
+print(module_list)
+print("len of blocks = ", len(blocks))
