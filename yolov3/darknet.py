@@ -1,8 +1,19 @@
 from __future__ import division
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from util import *
 #from torch.autograd import Variable (deprecated)
 import numpy as np
+
+def get_test_input():
+    img = cv2.imread("dog-cycle-car.png")
+    img = cv2.resize(img,(416,416))
+
+    img_ = img[:,:,::-1].transpose((2,0,1)) #BGR->RGB | HXWC->CXHXW
+    img_ = img_[np.newaxis,:,:,:]/255.0 # add a channel at 0 for batch and normalise
+    img_ = torch.from_numpy(img_).float()
+    return img_
 
 class EmptyLayer(nn.Module):
     def __init__(self):
@@ -50,7 +61,7 @@ def handle_upsample(
                 ):
     module = nn.Sequential()
     stride = int(block["stride"])
-    upsample = nn.Upsample(scale_factor=stride, mode="bilinear")#this is 2
+    upsample = nn.Upsample(scale_factor=stride, mode="nearest")#this is 2
     module.add_module("upsample_{}".format(index), upsample)
     module_list.append(module)
 
@@ -180,8 +191,64 @@ def create_modules_from_blocks(blocks):
         output_filters.append(prev_filters[0])
     print("len of output_filters = ", len(output_filters))
     return (net_info, module_list)
+
+class Darknet(nn.Module):
+    def __init__(self, cfg_file):
+        super(Darknet, self).__init__()
+        self.blocks = parse_cfg(cfg_file)
+        self.net_info, self.module_list = create_modules_from_blocks(self.blocks)
+    
+    def forward(self, x, CUDA):
+        modules = self.blocks[1:]
+        outputs = {} #cache the outputs for the router layer
+
+        write = 0 #TODO
+        for i, module in enumerate(modules):
+            module_type = (module["type"])
+            if module_type =="convolutional" or module_type == "upsample":
+                x = self.module_list[i](x)
+            elif module_type == "route":
+                layers = module["layers"]
+                layers = [int(a) for a in layers]
+                if layers[0] > 0:
+                    layers[0] = layers[0] - i
+                if len(layers) == 1:
+                    x = outputs[i + layers[0]]
+                else:
+                    if (layers[1]) > 0:
+                        layers[1] = layers[1] - i
+                    map1 = outputs[i + layers[0]]
+                    map2 = outputs[i + layers[1]]
+
+                    x = torch.cat((map1, map2), 1)
+            elif module_type == "shortcut":
+                from_ = int(module["from"])
+                x = outputs[i - 1] + outputs[i + from_]
+            elif module_type == "yolo":
+                anchors = self.module_list[i][0].anchors
+                #Get the input dim
+                input_dim = int(self.net_info["height"])
+
+                num_classes = int(module["classes"])
+                #transform
+                x = x.data
+                print("---,", x.size())#last lay x.size is torch.Size([1, 255, 52, 52])
+                x = predict_transform(x, input_dim,anchors, num_classes, CUDA)
+                if not write:
+                    detections = x
+                    write = 1
+                else:
+                    detections = torch.cat((detections,x), 1)
+
+            outputs[i] = x
+        return detections
+
 ###############test################
 
-blocks = parse_cfg("./cfg/yolov3.cfg")
-net_info , module_list = create_modules_from_blocks(blocks)
-print(module_list)
+#blocks = parse_cfg("./cfg/yolov3.cfg")
+#net_info , module_list = create_modules_from_blocks(blocks)
+model = Darknet("./cfg/yolov3.cfg")
+inp = get_test_input()
+#pred = model(inp, torch.cuda.is_available())
+pred = model(inp, False)
+print(pred)
