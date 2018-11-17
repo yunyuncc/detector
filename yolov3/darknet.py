@@ -48,9 +48,12 @@ def handle_upsample(
                 module_list,
                 prev_filters
                 ):
+    module = nn.Sequential()
     stride = int(block["stride"])
     upsample = nn.Upsample(scale_factor=stride, mode="bilinear")#this is 2
-    module_list.add_module("upsample_{}".format(index), upsample)
+    module.add_module("upsample_{}".format(index), upsample)
+    module_list.append(module)
+
 
 def handle_convolutional(block, 
                 index, 
@@ -133,7 +136,17 @@ def handle_yolo(block,
                 module_list, 
                 prev_filters):
     module = nn.Sequential()
-    
+    mask = block["mask"].split(",")
+    mask = [int(x) for x in mask]
+    anchors = block["anchors"].split(",")
+    anchors = [int(a) for a in anchors]
+    anchors = [(anchors[i], anchors[i+1]) for i in range(0, len(anchors), 2)]
+    anchors = [anchors[i] for i in mask]
+
+    detection = DetectionLayer(anchors)
+    module.add_module("Detection_{}".format(index), detection)
+    module_list.append(module)
+
 block_handlers = {
 'convolutional':handle_convolutional,
 'upsample':handle_upsample,
@@ -170,7 +183,5 @@ def create_modules_from_blocks(blocks):
 ###############test################
 
 blocks = parse_cfg("./cfg/yolov3.cfg")
-print('-------------')
 net_info , module_list = create_modules_from_blocks(blocks)
 print(module_list)
-print("len of blocks = ", len(blocks))
