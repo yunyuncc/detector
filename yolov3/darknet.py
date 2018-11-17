@@ -249,6 +249,6 @@ class Darknet(nn.Module):
 #net_info , module_list = create_modules_from_blocks(blocks)
 model = Darknet("./cfg/yolov3.cfg")
 inp = get_test_input()
-#pred = model(inp, torch.cuda.is_available())
-pred = model(inp, False)
+pred = model(inp, torch.cuda.is_available()) # TODO check why cuda can not use
+#pred = model(inp, False)
 print(pred)
