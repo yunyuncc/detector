@@ -9,10 +9,13 @@ import numpy as np
 def get_test_input():
     img = cv2.imread("dog-cycle-car.png")
     img = cv2.resize(img,(416,416))
+    #  ::-1 means start:end:step
+    #  width and height not change, change the color channel dim
+    img_ = img[:,:,::-1].transpose((2,0,1)) #BGR->RGB | H W C -> C H W 
 
-    img_ = img[:,:,::-1].transpose((2,0,1)) #BGR->RGB | HXWC->CXHXW
     img_ = img_[np.newaxis,:,:,:]/255.0 # add a channel at 0 for batch and normalise
     img_ = torch.from_numpy(img_).float()
+    #BCHW
     return img_
 
 class EmptyLayer(nn.Module):
@@ -197,8 +200,14 @@ class Darknet(nn.Module):
         super(Darknet, self).__init__()
         self.blocks = parse_cfg(cfg_file)
         self.net_info, self.module_list = create_modules_from_blocks(self.blocks)
-    
+        assert(len(self.blocks) == len(self.module_list)+1)
     def forward(self, x, CUDA):
+        #x is BCHW format
+        batch, channels, height, width = x.size()
+        assert(channels == int(self.net_info["channels"]))
+        assert(height == int(self.net_info["height"]))
+        assert(width == int(self.net_info["width"]))
+        print("input batch is ", batch)
         modules = self.blocks[1:]
         outputs = {} #cache the outputs for the router layer
 
@@ -249,6 +258,6 @@ class Darknet(nn.Module):
 #net_info , module_list = create_modules_from_blocks(blocks)
 model = Darknet("./cfg/yolov3.cfg")
 inp = get_test_input()
-pred = model(inp, torch.cuda.is_available()) # TODO check why cuda can not use
-#pred = model(inp, False)
+#pred = model(inp, torch.cuda.is_available()) # TODO check why cuda can not use
+pred = model(inp, False)
 print(pred)
