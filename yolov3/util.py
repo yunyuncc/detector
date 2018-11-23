@@ -39,15 +39,21 @@ def predict_transform(prediction, input_dim, anchors, num_classes, CUDA = True):
         x_offset = x_offset.cuda()
         y_offset = y_offset.cuda()
     x_y_offset = torch.cat((x_offset, y_offset),1).repeat(1,num_anchors).view(-1,2).unsqueeze(0)
+    if CUDA:
+        x_y_offset = x_y_offset.cpu()
     prediction[:,:,:2] += x_y_offset
 
     #log space transform height and the width
     anchors = torch.FloatTensor(anchors)
     if CUDA:
         anchors = anchors.cuda()
-
+    print("------------anchors:", anchors)
     anchors = anchors.repeat(grid_size*grid_size, 1).unsqueeze(0)
-    prediction[:,:,2:4] = torch.exp(prediction[:,:,2:4])*anchors
+    print("------------anchors2:", anchors)
+    if CUDA:
+        prediction[:,:,2:4] = torch.exp(prediction[:,:,2:4])*anchors.cpu()
+    else:
+        prediction[:,:,2:4] = torch.exp(prediction[:,:,2:4])*anchors
     
     #apply sigmoid to the class scores
     prediction[:,:,5:5+num_classes] = torch.sigmoid((prediction[:,:,5:5+num_classes]))
