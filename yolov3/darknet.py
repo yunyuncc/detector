@@ -192,7 +192,6 @@ def create_modules_from_blocks(blocks):
         else:
             print("has not handler_", block_type)
         output_filters.append(prev_filters[0])
-    print("len of output_filters = ", len(output_filters))
     return (net_info, module_list)
 
 class Darknet(nn.Module):
@@ -201,6 +200,72 @@ class Darknet(nn.Module):
         self.blocks = parse_cfg(cfg_file)
         self.net_info, self.module_list = create_modules_from_blocks(self.blocks)
         assert(len(self.blocks) == len(self.module_list)+1)
+        self.output_sizes = {}
+
+    def load_weights(self, weightfile):
+        fp = open(weightfile, "rb")
+
+        # header information
+        # 1.major version number
+        # 2.minor version number
+        # 3.subversion number
+        # 4,5 images seen by the network
+
+        header = np.fromfile(fp, dtype = np.int32, count = 5)
+        self.header = torch.from_numpy(header)
+        self.seen = self.header[3]
+        weights = np.fromfile(fp, dtype = np.float32)
+        ptr = 0
+        for i in range(len(self.module_list)):
+            module_type = self.blocks[i + 1]["type"]
+            if module_type == "convolutional":
+                model = self.module_list[i]
+                try:
+                    batch_normalize = int(self.blocks[i+1]["batch_normalize"])
+                except:
+                    batch_normalize = 0
+                conv = model[0]
+
+                if (batch_normalize):
+                    bn = model[1]
+                    num_bn_biases = bn.bias.numel()
+                    bn_biases = torch.from_numpy(weights[ptr:ptr+num_bn_biases])
+                    ptr += num_bn_biases
+                    bn_weights = torch.from_numpy(weights[ptr:ptr+num_bn_biases])
+                    ptr += num_bn_biases
+
+                    bn_running_mean = torch.from_numpy(weights[ptr:ptr + num_bn_biases])
+                    ptr += num_bn_biases
+
+                    bn_running_var = torch.from_numpy(weights[ptr:ptr+num_bn_biases])
+                    ptr += num_bn_biases
+                    #cast the loaded weights into dims of model weights
+                    bn_biases = bn_biases.view_as(bn.bias.data)
+                    bn_weights = bn_weights.view_as(bn.weight.data)
+                    bn_running_mean = bn_running_mean.view_as(bn.running_mean)
+                    bn_running_var = bn_running_var.view_as(bn.running_var)
+
+                    #copy the data to model
+                    bn.bias.data.copy_(bn_biases)
+                    bn.weight.data.copy_(bn_weights)
+                    bn.running_mean.copy_(bn_running_mean)
+                    bn_running_var.copy_(bn_running_var)
+                else:
+                    num_biases = conv.bias.numel()
+                    conv_biases = torch.from_numpy(weights[ptr:ptr+num_biases])
+                    ptr = ptr + num_biases
+                    conv_biases = conv_biases.view_as(conv.bias.data)
+                    conv.bias.data.copy_(conv_biases)
+                num_weights = conv.weight.numel()
+                conv_weights = torch.from_numpy(weights[ptr:ptr+num_weights])
+                ptr = ptr + num_weights
+
+                conv_weights = conv_weights.view_as(conv.weight.data)
+                conv.weight.data.copy_(conv_weights)
+
+
+
+
     def forward(self, x, CUDA):
         #x is BCHW format
         batch, channels, height, width = x.size()
@@ -228,12 +293,18 @@ class Darknet(nn.Module):
                         layers[1] = layers[1] - i
                     map1 = outputs[i + layers[0]]
                     map2 = outputs[i + layers[1]]
-
+                    assert(map1.size()[2] == map2.size()[2])
+                    assert(map1.size()[3] == map2.size()[3])
                     x = torch.cat((map1, map2), 1)
+                    assert(map1.size()[1] + map2.size(1) == x.size()[1])
             elif module_type == "shortcut":
                 from_ = int(module["from"])
+                assert(outputs[i-1].size() == outputs[i + from_].size())
                 x = outputs[i - 1] + outputs[i + from_]
             elif module_type == "yolo":
+                #[1, 255, 13, 13]==>[1, 507, 85]
+                #[1, 255, 26, 26]==>[1, 2028, 85]
+                #[1, 255, 52, 52]==>[1, 8112, 85]
                 anchors = self.module_list[i][0].anchors
                 #Get the input dim
                 input_dim = int(self.net_info["height"])
@@ -242,6 +313,7 @@ class Darknet(nn.Module):
                 #transform
                 x = x.data
                 print("---,", x.size())#last lay x.size is torch.Size([1, 255, 52, 52])
+                print("predict_transform: input_dim=", input_dim, " anchors=", anchors, " num_classes=", num_classes)
                 x = predict_transform(x, input_dim,anchors, num_classes, CUDA)
                 if not write:
                     detections = x
@@ -250,6 +322,7 @@ class Darknet(nn.Module):
                     detections = torch.cat((detections,x), 1)
 
             outputs[i] = x
+            self.output_sizes[i] = x.size()
         return detections
 
 ###############test################
@@ -257,7 +330,12 @@ class Darknet(nn.Module):
 #blocks = parse_cfg("./cfg/yolov3.cfg")
 #net_info , module_list = create_modules_from_blocks(blocks)
 model = Darknet("./cfg/yolov3.cfg")
+model.load_weights("weights/yolov3.weights")
+print("-- model:", model)
 inp = get_test_input()
+print("input size:", inp.size())
 #pred = model(inp, torch.cuda.is_available()) # TODO check why cuda can not use
 pred = model(inp, False)
+#print("all_outputs:", model.output_sizes)
+print(pred.size())
 print(pred)

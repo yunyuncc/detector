@@ -7,16 +7,17 @@ import numpy as np
 import cv2
 
 def predict_transform(prediction, input_dim, anchors, num_classes, CUDA = True):
-    print("prediction size is ", prediction.size())
     batch_size = prediction.size(0)
     stride = input_dim // prediction.size(2)
-    grid_size = input_dim // stride
-    bbox_attrs = 5 + num_classes
-    num_anchors = len(anchors)
-    print("input dim:", input_dim)
-    print("values:", batch_size, ",", stride, ",", grid_size, ",", bbox_attrs,",", num_anchors)
+    print("stride:", stride)
+    grid_size = input_dim // stride #13 26 52
+    print("prediction.size(2)=", prediction.size(2), "  grid_size=", grid_size)
+    bbox_attrs = 5 + num_classes # 85
+    num_anchors = len(anchors)# 3
+    print("input dim:", input_dim) #416
+
     prediction = prediction.view(batch_size, bbox_attrs*num_anchors, grid_size*grid_size)
-    print(batch_size, ",", bbox_attrs*num_anchors, ",", grid_size*grid_size)
+    print("[batch_size, bbox_attrs*num_anchors, grid_size**2]",batch_size, ",", bbox_attrs*num_anchors, ",", grid_size*grid_size)
     print(prediction.size())
 
     prediction = prediction.transpose(1,2).contiguous()
