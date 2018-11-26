@@ -61,3 +61,27 @@ def predict_transform(prediction, input_dim, anchors, num_classes, CUDA = True):
     prediction[:,:,:4] *= stride
 
     return prediction
+
+
+def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
+    print("pre size:", prediction.size())
+    conf_mask = (prediction[:,:,4] > confidence)
+    conf_mask = conf_mask.float()
+    conf_mask = conf_mask.unsqueeze(2)
+    prediction = prediction*conf_mask
+    print(prediction.size())
+
+    #center_x, center_y, height, width ==> top_left_x, top_left_y, right_bottom_x, right_bottom_y
+    box_corner = prediction.new(prediction.shape)
+    box_corner[:,:,0] = (prediction[:,:,0] - prediction[:,:,2]/2)
+    box_corner[:,:,1] = (prediction[:,:,1] - prediction[:,:,3]/2)
+    box_corner[:,:,2] = (prediction[:,:,0] + prediction[:,:,2]/2)
+    box_corner[:,:,3] = (prediction[:,:,1] + prediction[:,:,3]/2)
+    prediction[:,:,:4] = box_corner[:,:,:4]
+
+    batch_size = prediction.size(0)
+
+    write = False
+    for i in range(batch_size):
+        image_pred = prediction[i]
+        print(image_pred.size())
