@@ -62,6 +62,14 @@ def predict_transform(prediction, input_dim, anchors, num_classes, CUDA = True):
 
     return prediction
 
+def unique(tensor):
+    tensor_np = tensor.cpu().numpy()
+    unique_np = np.unique(tensor_np)
+    unique_tensor = torch.from_numpy(unique_np)
+
+    tensor_res = tensor.new(unique_tensor.shape)
+    tensor_res.copy_(unique_tensor)
+    return tensor_res
 
 def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
     print("pre size:", prediction.size())
@@ -85,3 +93,31 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
     for i in range(batch_size):
         image_pred = prediction[i]
         print(image_pred.size())
+        max_conf, max_conf_score = torch.max(image_pred[:,5:5+num_classes], 1)
+        print("max_conf.size=", max_conf.size())
+        print("max_conf_score.size=", max_conf_score.size())
+        max_conf = max_conf.float().unsqueeze(1)
+        max_conf_score = max_conf_score.float().unsqueeze(1)
+        seq = (image_pred[:,:5], max_conf, max_conf_score)
+        #top-left-x,top-left-y,bottom-right-x,bottom-right-y,max-class-score-index,max-class-score
+        image_pred = torch.cat(seq,1)
+        print("image_pred.size=", image_pred.size())
+
+        non_zero_ind = (torch.nonzero(image_pred[:,4]))
+        print("non-zero-ind.size=", non_zero_ind.size())
+        try:
+            image_pred_ = image_pred[non_zero_ind.squeeze(),:].view(-1,7)
+        except:
+            continue
+        
+        #For PyTorch 0.4 compatibility
+        #Since the above code with not raise exception for no detection 
+        #as scalars are supported in PyTorch 0.4
+        if image_pred_.shape[0] == 0:
+            continue 
+        print("image_pred_.size=", image_pred_.size())
+        print("image_pred_=", image_pred_)
+        img_classes = unique(image_pred_[:,-1])#-1 is the last col,which is class label
+
+        print("img_classes.size=", img_classes.size())
+        print("img_classes=", img_classes)
