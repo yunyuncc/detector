@@ -9,16 +9,12 @@ import cv2
 def predict_transform(prediction, input_dim, anchors, num_classes, CUDA = True):
     batch_size = prediction.size(0)
     stride = input_dim // prediction.size(2)
-    print("stride:", stride)
     grid_size = input_dim // stride #13 26 52
-    print("prediction.size(2)=", prediction.size(2), "  grid_size=", grid_size)
     bbox_attrs = 5 + num_classes # 85
     num_anchors = len(anchors)# 3
-    print("input dim:", input_dim) #416
 
     prediction = prediction.view(batch_size, bbox_attrs*num_anchors, grid_size*grid_size)
-    print("[batch_size, bbox_attrs*num_anchors, grid_size**2]",batch_size, ",", bbox_attrs*num_anchors, ",", grid_size*grid_size)
-    print(prediction.size())
+    #print("[batch_size, bbox_attrs*num_anchors, grid_size**2]",batch_size, ",", bbox_attrs*num_anchors, ",", grid_size*grid_size)
 
     prediction = prediction.transpose(1,2).contiguous()
     prediction = prediction.view(batch_size, grid_size*grid_size*num_anchors, bbox_attrs)
@@ -47,9 +43,7 @@ def predict_transform(prediction, input_dim, anchors, num_classes, CUDA = True):
     anchors = torch.FloatTensor(anchors)
     if CUDA:
         anchors = anchors.cuda()
-    print("------------anchors:", anchors)
     anchors = anchors.repeat(grid_size*grid_size, 1).unsqueeze(0)
-    print("------------anchors2:", anchors)
     if CUDA:
         prediction[:,:,2:4] = torch.exp(prediction[:,:,2:4])*anchors.cpu()
     else:
@@ -78,6 +72,7 @@ def bbox_iou(box1, box2):
     #Get the coordinates of bounding boxes
     b1_x1, b1_y1, b1_x2, b1_y2 = box1[:,0], box1[:,1], box1[:,2], box1[:,3]
     b2_x1, b2_y1, b2_x2, b2_y2 = box2[:,0], box2[:,1], box2[:,2], box2[:,3]
+
     
     #get the corrdinates of the intersection rectangle
     inter_rect_x1 =  torch.max(b1_x1, b2_x1)
@@ -97,7 +92,6 @@ def bbox_iou(box1, box2):
     return iou
 
 def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
-    print("pre size:", prediction.size())
     #将 object_score 小于confidence的全部置为0
     conf_mask = (prediction[:,:,4] > confidence)
     conf_mask = conf_mask.float()
@@ -114,8 +108,8 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
 
     batch_size = prediction.size(0)
     write = False
-    for i in range(batch_size):
-        image_pred = prediction[i]
+    for ind in range(batch_size):
+        image_pred = prediction[ind]
         #将prediction矩阵的每一行的信息变成如下形式
         #top-left-x,top-left-y,bottom-right-x,bottom-right-y,max-class-score-index,max-class-score
         max_class_score_idx, max_class_score = torch.max(image_pred[:,5:5+num_classes], 1)
@@ -126,7 +120,6 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
 
         #去掉所有object_score值为0的行
         non_zero_ind = (torch.nonzero(image_pred[:,4]))
-        print("non-zero-ind.size=", non_zero_ind.size())
         try:
             image_pred_ = image_pred[non_zero_ind.squeeze(),:].view(-1,7)
         except:
@@ -155,8 +148,8 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
             image_pred_class = image_pred_class[object_score_sort_idx]
             #print("[",cls,"] sorted image_pred_class=\n", image_pred_class) 
 
+            #进行非极大值抑制
             idx = image_pred_class.size(0)
-
             for i in range(idx):
                 try:
                     ious = bbox_iou(image_pred_class[i].unsqueeze(0), image_pred_class[i+1:])
@@ -172,5 +165,18 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
                 non_zero_ind = torch.nonzero(image_pred_class[:,4]).squeeze()
                 image_pred_class = image_pred_class[non_zero_ind].view(-1,7)
             
-            print("[", cls,"] after nms image_pred_class:", image_pred_class)
+            #print("[", cls,"] after nms image_pred_class:", image_pred_class, image_pred_class.size())
+            batch_ind = image_pred_class.new(image_pred_class.size(0), 1).fill_(ind)
+            seq = batch_ind, image_pred_class
 
+            if not write:
+                output = torch.cat(seq, 1)
+                write = True
+            else:
+                out = torch.cat(seq, 1)
+                output = torch.cat((output, out))
+
+        try:
+            return output
+        except:
+            return 0

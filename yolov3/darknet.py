@@ -312,8 +312,8 @@ class Darknet(nn.Module):
                 num_classes = int(module["classes"])
                 #transform
                 x = x.data
-                print("---,", x.size())#last lay x.size is torch.Size([1, 255, 52, 52])
-                print("predict_transform: input_dim=", input_dim, " anchors=", anchors, " num_classes=", num_classes)
+                print("row yolo output:,", x.size())#last lay x.size is torch.Size([1, 255, 52, 52])
+                #print("predict_transform: input_dim=", input_dim, " anchors=", anchors, " num_classes=", num_classes)
                 x = predict_transform(x, input_dim,anchors, num_classes, CUDA)
                 if not write:
                     detections = x
@@ -331,12 +331,12 @@ class Darknet(nn.Module):
 #net_info , module_list = create_modules_from_blocks(blocks)
 model = Darknet("./cfg/yolov3.cfg")
 model.load_weights("weights/yolov3.weights")
-print("-- model:", model)
 inp = get_test_input()
 print("input size:", inp.size())
 pred = model(inp, torch.cuda.is_available()) 
 #pred = model(inp, False)
 #print("all_outputs:", model.output_sizes)
-print(pred.size())
-print(pred)
-write_results(pred, 0.6, 80)
+print("forward output size:",pred.size())
+print("doing post work---------")
+output = write_results(pred, 0.6, 80)
+print("output:", output)
