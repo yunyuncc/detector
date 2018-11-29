@@ -36,13 +36,20 @@ def arg_parse():
                         default="416", type=str)
     return parser.parse_args()
 
-def load_classes(namesfile):
-    fp = open(namesfile,"r")
-    names = fp.read().split("\n")[:-1]
-    return names
+def load_imgs(images_path):
+    try:
+        imlist = [osp.join(osp.realpath('.'), images_path, img) for img in os.listdir(images_path)]
+    except NotADirectoryError:
+        print("{} is not a dir".format(images_path))
+        imlist = []
+        imlist.append(osp.join(osp.realpath('.'), images_path))
+    except FileNotFoundError:
+        print("No file or dir with the name {}".format(images_path))
+        exit()
+    return imlist
 
 args = arg_parse()
-images = args.images
+images_dir = args.images
 batch_size = int(args.bs)
 confidence = float(args.confidence)
 nms_thesh = float(args.nms_thesh)
@@ -50,7 +57,7 @@ start = 0
 CUDA = torch.cuda.is_available()
 num_classes = 80
 classes = load_classes("data/coco.names")
-print("images:", images)
+print("images:", images_dir)
 print("batch_size:", batch_size)
 print("confidence:", confidence)
 print("nms_thesh:", nms_thesh)
@@ -75,3 +82,14 @@ if CUDA:
 #Sets the module in evaluation mode.
 model.eval()
 
+read_dir_time = time.time()
+img_list = load_imgs(images_dir)
+print(img_list)
+print("read_dir_time:",read_dir_time)
+
+
+if not os.path.exists(args.det):
+    os.makedirs(args.det)
+
+load_batch_time = time.time()
+loaded_imgs = [cv2.imread(x) for x in img_list]
