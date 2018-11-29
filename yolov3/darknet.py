@@ -280,6 +280,8 @@ class Darknet(nn.Module):
         for i, module in enumerate(modules):
             module_type = (module["type"])
             if module_type =="convolutional" or module_type == "upsample":
+                if CUDA:
+                    x = x.cuda()
                 x = self.module_list[i](x)
             elif module_type == "route":
                 layers = module["layers"]
@@ -334,7 +336,12 @@ if __name__ == '__main__':
     model.load_weights("weights/yolov3.weights")
     inp = get_test_input()
     print("input size:", inp.size())
-    pred = model(inp, torch.cuda.is_available()) 
+    CUDA = torch.cuda.is_available()
+    CUDA = False
+    if CUDA:
+        model.cuda()
+        print("use CUDA model")
+    pred = model(inp, CUDA) 
     print("forward output size:",pred.size())
     print("doing post work---------")
     output = write_results(pred, 0.6, 80)
