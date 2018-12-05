@@ -93,3 +93,18 @@ if not os.path.exists(args.det):
 
 load_batch_time = time.time()
 loaded_imgs = [cv2.imread(x) for x in img_list]
+
+# change all cv::Mat to Tensor([1, 3, 416, 416]) 
+img_batches = list(map(prepare_image, loaded_imgs, [inp_dim for x in range(len(img_list))]))
+img_dim_list = [(x.shape[1], x.shape[0]) for x in loaded_imgs]
+print("img_dim_list:",img_dim_list)
+img_dim_list = torch.FloatTensor(img_dim_list).repeat(1,2)
+print("img_dim_list:",img_dim_list, img_dim_list.size())
+
+if CUDA:
+    img_dim_list = img_dim_list.cuda()
+
+#create batches
+print("before create batch img_batches:", len(img_batches)," item size:", img_batches[0].size())
+img_batches = create_batch(img_batches,3)
+print("after create batch img_batches:", len(img_batches)," item size:", img_batches[0].size())
