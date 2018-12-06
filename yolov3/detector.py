@@ -9,6 +9,7 @@ import argparse
 import os
 import os.path as osp
 from darknet import Darknet
+from darknet import get_test_input
 import pickle as pkl
 import pandas as pd
 import random
@@ -24,7 +25,7 @@ def arg_parse():
     parser.add_argument("--bs", dest="bs", help = "Batch size", default = 1)
     parser.add_argument("--confidence", dest="confidence",
                         help="Object confidence to filter predictions",
-                        default=0.5)
+                        default=0.6)
     parser.add_argument("--nms_thesh", dest= "nms_thesh",
                         help="NMS Threshold",
                         default=0.4)
@@ -57,14 +58,6 @@ start = 0
 CUDA = torch.cuda.is_available()
 num_classes = 80
 classes = load_classes("data/coco.names")
-print("images:", images_dir)
-print("batch_size:", batch_size)
-print("confidence:", confidence)
-print("nms_thesh:", nms_thesh)
-print("CUDA:", CUDA)
-print("classes:", classes)
-
-print("Loading network......")
 model = Darknet(args.cfgfile)
 model.load_weights(args.weightsfile)
 print("Network successfully loaded")
@@ -80,7 +73,7 @@ if CUDA:
     model.cuda()
     print("use CUDA model success")
 #Sets the module in evaluation mode.
-model.eval()
+#model.eval()
 
 read_dir_time = time.time()
 img_list = load_imgs(images_dir)
@@ -97,14 +90,34 @@ loaded_imgs = [cv2.imread(x) for x in img_list]
 # change all cv::Mat to Tensor([1, 3, 416, 416]) 
 img_batches = list(map(prepare_image, loaded_imgs, [inp_dim for x in range(len(img_list))]))
 img_dim_list = [(x.shape[1], x.shape[0]) for x in loaded_imgs]
-print("img_dim_list:",img_dim_list)
+
 img_dim_list = torch.FloatTensor(img_dim_list).repeat(1,2)
-print("img_dim_list:",img_dim_list, img_dim_list.size())
 
 if CUDA:
     img_dim_list = img_dim_list.cuda()
 
 #create batches
-print("before create batch img_batches:", len(img_batches)," item size:", img_batches[0].size())
 img_batches = create_batch(img_batches,3)
-print("after create batch img_batches:", len(img_batches)," item size:", img_batches[0].size())
+
+test_input = get_test_input()
+prediction = model(img_batches[0], CUDA)
+print("prediction size after foward:", prediction.size())
+print("-------pred:", prediction)
+output = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
+print("output size after write_results:", output.size())
+
+"""
+write = 0
+start_det_loop_time = time.time()
+
+for i, batch in enumerate(img_batches):
+    start = time.time()
+    if CUDA:
+        batch = batch.cuda()
+
+    prediction = model(batch, CUDA)
+    print("prediction size after foward:", prediction.size())
+    output = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
+    print("output size after write_results:", output.size())
+    end = time.time()
+"""

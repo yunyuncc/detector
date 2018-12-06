@@ -88,6 +88,8 @@ def bbox_iou(box1, box2):
     return iou
 
 def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
+    print("call write_wresult, prediction.size=", prediction.size(), " confidence=", confidence,
+            " num_class=", num_classes, " nms_conf=", nms_conf)
     #将 object_score 小于confidence的全部置为0
     conf_mask = (prediction[:,:,4] > confidence)
     conf_mask = conf_mask.float()
@@ -128,7 +130,7 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
 
 
         img_classes = unique(image_pred_[:,-1])#-1 is the last col,which is class label
-
+    
         #对每个不同的class进行非极大值抑制
         for cls in img_classes:
             #perform NMS
@@ -200,6 +202,7 @@ def prepare_image(img, inp_dim):
     img = torch.from_numpy(img).float().div(255.0).unsqueeze(0)
     print("prepare_image return size:", img.size())
     return img
+
 def create_batch(img_list_to_batch, batch_size):
     leftover = 0
     if (len(img_list_to_batch) % batch_size):
@@ -208,4 +211,14 @@ def create_batch(img_list_to_batch, batch_size):
         num_batches = len(img_list_to_batch)//batch_size + leftover
         batched_img_list = [torch.cat((img_list_to_batch[i*batch_size : min((i+1)*batch_size, len(img_list_to_batch))])) for i in range(num_batches)]
         return batched_img_list
+
+def to_csv(tensor, file_name):
+    tensor = tensor.view(1, -1)
+    if not (tensor.device == 'cpu'):
+        tensor = tensor.cpu()
+    try:
+        ndata = tensor.numpy()
+    except RuntimeError:
+        ndata = tensor.detach().numpy()
+    np.savetxt(file_name, ndata, delimiter=",")
 
