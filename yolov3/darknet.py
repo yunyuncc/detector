@@ -315,6 +315,7 @@ class Darknet(nn.Module):
 
                 if (batch_normalize):
                     bn = model[1]
+                    print("bn:",bn)
                     num_bn_biases = bn.bias.numel()
                     bn_biases = torch.from_numpy(weights[ptr:ptr+num_bn_biases])
                     ptr += num_bn_biases
@@ -429,7 +430,7 @@ if __name__ == '__main__':
     
     model.load_weights_old("/home/wyy/pytorch/my/detector/yolov3/weights/yolov3.weights")
     print("------begin")
-    print(model.state_dict())
+    #print(model.state_dict())
     print("------end")
     inp = get_test_input()
     CUDA = torch.cuda.is_available()
@@ -439,8 +440,8 @@ if __name__ == '__main__':
     model.eval()
 
     
-    print("inp:", inp)
+    print("inp size:", inp.size())
     pred = model(inp.cuda(), CUDA) 
     output = write_results(pred, 0.6, 80)
-    print(output)
+    print("output size:",output.size())
     
