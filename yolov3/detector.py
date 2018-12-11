@@ -73,12 +73,11 @@ if CUDA:
     model.cuda()
     print("use CUDA model success")
 #Sets the module in evaluation mode.
-#model.eval()
+model.eval()
 
 read_dir_time = time.time()
 img_list = load_imgs(images_dir)
-print(img_list)
-print("read_dir_time:",read_dir_time)
+print("img_list:",img_list)
 
 
 if not os.path.exists(args.det):
@@ -99,15 +98,8 @@ if CUDA:
 #create batches
 img_batches = create_batch(img_batches,3)
 
-test_input = get_test_input()
-prediction = model(img_batches[0], CUDA)
-print("prediction size after foward:", prediction.size())
-print("-------pred:", prediction)
-output = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
-print("output size after write_results:", output.size())
 
-"""
-write = 0
+write = False
 start_det_loop_time = time.time()
 
 for i, batch in enumerate(img_batches):
@@ -116,8 +108,31 @@ for i, batch in enumerate(img_batches):
         batch = batch.cuda()
 
     prediction = model(batch, CUDA)
-    print("prediction size after foward:", prediction.size())
-    output = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
-    print("output size after write_results:", output.size())
+    prediction = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
     end = time.time()
-"""
+
+    if type(prediction) == int:
+        for img_num, image in enumerate(img_list[i*batch_size: min((i +  1)*batch_size, len(imlist))]):
+            print("img_num:", img_num, " image:", image)
+            img_id = i*batch_size + img_num
+            print("img_id has not object detected")
+        continue
+    
+    prediction[:,0] += i*batch_size # transform the first attribute from index in mini batch to 
+                                    # index in img_list
+    if not write:
+        output = prediction
+        write = True
+    else:
+        output = torch.cat((output, prediction), dim = 0)
+
+    for img_num, image in enumerate(img_list[i*batch_size: min((i +  1)*batch_size, len(img_list))]):
+        img_id = i*batch_size + img_num
+        objs = [classes[int(x[-1])] for x in output if int(x[0]) == img_id]
+        print("objs:", objs) 
+        image_name = image.split("/")[-1]
+        print("{0:20s} predicted in {1:6.3f} seconds".format(image_name, (end - start)/batch_size))
+        print("{0:20s} {1:s}".format("Objects Detected:", " ".join(objs)))
+        print("----------------------------------------------------------")
+    if CUDA:
+        torch.cuda.synchronize()
