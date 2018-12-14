@@ -37,7 +37,7 @@ def arg_parse():
                         default="416", type=str)
     return parser.parse_args()
 
-def load_imgs(images_path):
+def get_img_names(images_path):
     try:
         imlist = [osp.join(osp.realpath('.'), images_path, img) for img in os.listdir(images_path)]
     except NotADirectoryError:
@@ -49,45 +49,51 @@ def load_imgs(images_path):
         exit()
     return imlist
 
+def create_model(args, CUDA):
+
+    model = Darknet(args.cfgfile)
+    model.load_weights(args.weightsfile)
+    print("Network successfully loaded")
+    model.net_info["height"] = args.reso
+
+    if CUDA:
+        #Moves all model parameters and buffers to the GPU.
+        print("setting network to CUDA model......")
+        model.cuda()
+        print("use CUDA model success")
+    #Sets the module in evaluation mode.
+    model.eval()
+    return model
+
 args = arg_parse()
 images_dir = args.images
 batch_size = int(args.bs)
 confidence = float(args.confidence)
 nms_thesh = float(args.nms_thesh)
+
 start = 0
 CUDA = torch.cuda.is_available()
 num_classes = 80
 classes = load_classes("data/coco.names")
-model = Darknet(args.cfgfile)
-model.load_weights(args.weightsfile)
-print("Network successfully loaded")
-model.net_info["height"] = args.reso
+model = create_model(args, CUDA)
 inp_dim = int(model.net_info["height"])
-
 assert( inp_dim % 32 == 0)
 assert( inp_dim > 32)
 
-if CUDA:
-    #Moves all model parameters and buffers to the GPU.
-    print("setting network to CUDA model......")
-    model.cuda()
-    print("use CUDA model success")
-#Sets the module in evaluation mode.
-model.eval()
 
 read_dir_time = time.time()
-img_list = load_imgs(images_dir)
-print("img_list:",img_list)
+img_name_list = get_img_names(images_dir)
+print("img_name_list:",img_name_list)
 
 
 if not os.path.exists(args.det):
     os.makedirs(args.det)
 
 load_batch_time = time.time()
-loaded_imgs = [cv2.imread(x) for x in img_list]
+loaded_imgs = [cv2.imread(x) for x in img_name_list]
 
 # change all cv::Mat to Tensor([1, 3, 416, 416]) 
-img_batches = list(map(prepare_image, loaded_imgs, [inp_dim for x in range(len(img_list))]))
+img_batches = list(map(prepare_image, loaded_imgs, [inp_dim for x in range(len(loaded_imgs))]))
 img_dim_list = [(x.shape[1], x.shape[0]) for x in loaded_imgs]
 
 img_dim_list = torch.FloatTensor(img_dim_list).repeat(1,2)
@@ -112,21 +118,21 @@ for i, batch in enumerate(img_batches):
     end = time.time()
 
     if type(prediction) == int:
-        for img_num, image in enumerate(img_list[i*batch_size: min((i +  1)*batch_size, len(imlist))]):
+        for img_num, image in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
             print("img_num:", img_num, " image:", image)
             img_id = i*batch_size + img_num
             print("img_id has not object detected")
         continue
     
     prediction[:,0] += i*batch_size # transform the first attribute from index in mini batch to 
-                                    # index in img_list
+                                    # index in img_name_list
     if not write:
         output = prediction
         write = True
     else:
         output = torch.cat((output, prediction), dim = 0)
 
-    for img_num, image in enumerate(img_list[i*batch_size: min((i +  1)*batch_size, len(img_list))]):
+    for img_num, image in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
         img_id = i*batch_size + img_num
         objs = [classes[int(x[-1])] for x in output if int(x[0]) == img_id]
         print("objs:", objs) 
@@ -136,3 +142,10 @@ for i, batch in enumerate(img_batches):
         print("----------------------------------------------------------")
     if CUDA:
         torch.cuda.synchronize()
+
+try:
+    output
+except NameError:
+    print("No detection result")
+    exit()
+print("------")
