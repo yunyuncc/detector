@@ -1,12 +1,22 @@
 import cv2
 import numpy as np
 
-cap = cv2.VideoCapture("/dev/video0")
+#图片存储路径
+prefix_path = "img"
+#摄像头地址
+dev_path = "/dev/video0"
+
+
+
+cap = cv2.VideoCapture(dev_path)
 cnt = 0
 while(True):
     cnt = cnt+1
-    name = "img/{}.jpg".format(cnt)
+    name = "{}/{}.jpg".format(prefix_path, cnt)
     ret, frame = cap.read()
+    if ret == False:
+        print("read frame fail")
+        break
     cv2.imshow("frame", frame)
     cv2.imwrite(name, frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
