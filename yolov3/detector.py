@@ -109,6 +109,7 @@ for i, batch in enumerate(img_batches):
     #2.走前向传播
     with torch.no_grad():
         prediction = model(batch, CUDA)
+        print("batch i=", i, " forward res:", prediction)
     #3.解析前向传播的结果，处理后的prediction的格式为(TODO [index_in_mini_batch,...])
     prediction = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
     end = time.time()
@@ -151,3 +152,5 @@ except NameError:
 print("------")
 print(output.size())
 print(output[:,0])
+
+#TODO fix 前向传播的结果不一样

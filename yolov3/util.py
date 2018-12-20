@@ -177,6 +177,7 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
         print("write_result output:", output[:,0])
         return output
     except:
+        print("write_write no result")
         return 0
 
 def letterbox_image(img, inp_dim):
