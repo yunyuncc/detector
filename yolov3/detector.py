@@ -114,43 +114,52 @@ if CUDA:
     img_dim_list = img_dim_list.cuda()
 
 #create batches
-img_batches = create_batch(img_batches,3)
+img_batches = create_batch(img_batches,5)
 
 
 write = False
 start_det_loop_time = time.time()
 
+#分批迭代所有的打包好的img
 for i, batch in enumerate(img_batches):
     start = time.time()
+    #1.将图片数据复制到显存中
     if CUDA:
         batch = batch.cuda()
-
+    #2.走前向传播
     prediction = model(batch, CUDA)
+    #3.解析前向传播的结果，处理后的prediction的格式为(TODO [index_in_mini_batch,...])
     prediction = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
     end = time.time()
 
+    #4.显示prediction结果
+    #4.1.没有检测出对象的帧就不跳过，不保存到output里面去
     if type(prediction) == int:
-        for img_num, image in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
+        for img_num, image_name in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
             img_id = i*batch_size + img_num
-            print("img_id {} has not object detected", img_id)
+            print("img_id-{} image_name-{} has not object detected", img_id, image_name)
         continue
     
     prediction[:,0] += i*batch_size # transform the first attribute from index in mini batch to 
                                     # index in img_name_list
+
+    #5.将每个mini_batch的结果都串联到output里面去
     if not write:
         output = prediction
         write = True
     else:
         output = torch.cat((output, prediction), dim = 0)
 
-    for img_num, image in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
+    #6.print出每一帧检测出的物体
+    for img_num, full_image_path in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
         img_id = i*batch_size + img_num
         objs = [classes[int(x[-1])] for x in output if int(x[0]) == img_id]
-        image_name = image.split("/")[-1]
+        image_name = full_image_path.split("/")[-1]
         print("------------------img_id {}----------img_name {}------------------------------".format(img_id, image_name))
         print("{0:20s} predicted in {1:6.3f} seconds".format(image_name, (end - start)/batch_size))
         print("{0:20s} {1:s}".format("Objects Detected:", " ".join(objs)))
         print("----------------------------------------------------------")
+    #7.同步等待当前mini_batch中的每个图片都处理完成
     if CUDA:
         torch.cuda.synchronize()
 
