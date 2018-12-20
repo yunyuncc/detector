@@ -54,11 +54,9 @@ def get_num_img_names(images_path, num):
     img_list = []
     for i in range(num):
         name = "{}.jpg".format(i)
-        try:
-            img_list.append(osp.join(osp.realpath('.'), images_path, name))
-        except FileNotFoundError:
-            print("{} file not exist break".format(name))
-            break
+        full_file_path = osp.join(osp.realpath('.'), images_path, name)
+        if osp.exists(full_file_path):
+            img_list.append(full_file_path)
     return img_list
 
 def create_model(args, CUDA):
@@ -78,8 +76,8 @@ def create_model(args, CUDA):
     return model
 
 args = arg_parse()
-images_dir = args.images
-batch_size = 5
+images_dir = "/home/wyy/pytorch/my/detector/yolov3/imgs"
+batch_size = 3
 confidence = float(args.confidence)
 nms_thesh = float(args.nms_thesh)
 
@@ -96,6 +94,8 @@ assert( inp_dim > 32)
 read_dir_time = time.time()
 img_name_list = get_num_img_names(images_dir, 100)
 
+print(img_name_list)
+
 
 if not os.path.exists(args.det):
     os.makedirs(args.det)
@@ -104,7 +104,7 @@ load_batch_time = time.time()
 loaded_imgs = [cv2.imread(x) for x in img_name_list]
 
 # change all cv::Mat to Tensor([1, 3, 416, 416]) 
-img_batches = list(map(prepare_image, loaded_imgs, [inp_dim for x in range(len(loaded_imgs))]))
+img_batches = list(map(prepare_image, loaded_imgs, [img_name for img_name in img_name_list],[inp_dim for x in range(len(loaded_imgs))]))
 img_dim_list = [(x.shape[1], x.shape[0]) for x in loaded_imgs]
 
 img_dim_list = torch.FloatTensor(img_dim_list).repeat(1,2)

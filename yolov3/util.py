@@ -197,7 +197,9 @@ def load_classes(namesfile):
     names = fp.read().split("\n")[:-1]
     return names
 
-def prepare_image(img, inp_dim):
+def prepare_image(img, img_name, inp_dim):
+    if img is None:
+        raise ValueError("{} data is empty".format(img_name))
     img = cv2.resize(img, (inp_dim, inp_dim))
     img = img[:,:,::-1].transpose((2,0,1)).copy() #BGR->RGB | H W C -> C H W 
     img = torch.from_numpy(img).float().div(255.0).unsqueeze(0)
