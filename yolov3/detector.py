@@ -49,6 +49,18 @@ def get_img_names(images_path):
         exit()
     return imlist
 
+
+def get_num_img_names(images_path, num):
+    img_list = []
+    for i in range(num):
+        name = "{}.jpg".format(i)
+        try:
+            img_list.append(osp.join(osp.realpath('.'), images_path, name))
+        except FileNotFoundError:
+            print("{} file not exist break".format(name))
+            break
+    return img_list
+
 def create_model(args, CUDA):
 
     model = Darknet(args.cfgfile)
@@ -82,7 +94,7 @@ assert( inp_dim > 32)
 
 
 read_dir_time = time.time()
-img_name_list = get_img_names(images_dir)
+img_name_list = get_num_img_names(images_dir, 100)
 print("img_name_list:",img_name_list)
 
 
@@ -119,9 +131,8 @@ for i, batch in enumerate(img_batches):
 
     if type(prediction) == int:
         for img_num, image in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
-            print("img_num:", img_num, " image:", image)
             img_id = i*batch_size + img_num
-            print("img_id has not object detected")
+            print("img_id {} has not object detected", img_id)
         continue
     
     prediction[:,0] += i*batch_size # transform the first attribute from index in mini batch to 
@@ -135,8 +146,8 @@ for i, batch in enumerate(img_batches):
     for img_num, image in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
         img_id = i*batch_size + img_num
         objs = [classes[int(x[-1])] for x in output if int(x[0]) == img_id]
-        print("objs:", objs) 
         image_name = image.split("/")[-1]
+        print("------------------img_id {}----------img_name {}------------------------------".format(img_id, image_name))
         print("{0:20s} predicted in {1:6.3f} seconds".format(image_name, (end - start)/batch_size))
         print("{0:20s} {1:s}".format("Objects Detected:", " ".join(objs)))
         print("----------------------------------------------------------")

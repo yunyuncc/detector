@@ -11,8 +11,8 @@ dev_path = "/dev/video0"
 cap = cv2.VideoCapture(dev_path)
 cnt = 0
 while(True):
-    cnt = cnt+1
     name = "{}/{}.jpg".format(prefix_path, cnt)
+    cnt = cnt + 1
     ret, frame = cap.read()
     if ret == False:
         print("read frame fail")
