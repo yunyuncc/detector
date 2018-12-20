@@ -88,8 +88,8 @@ def bbox_iou(box1, box2):
     return iou
 
 def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
-    print("call write_wresult, prediction.size=", prediction.size(), " confidence=", confidence,
-            " num_class=", num_classes, " nms_conf=", nms_conf)
+    #print("call write_wresult, prediction.size=", prediction.size(), " confidence=", confidence,
+    #        " num_class=", num_classes, " nms_conf=", nms_conf)
     #将 object_score 小于confidence的全部置为0
     conf_mask = (prediction[:,:,4] > confidence)
     conf_mask = conf_mask.float()
@@ -175,6 +175,7 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
                 output = torch.cat((output, out))
 
         try:
+            print("write_result output:", output[:,0])
             return output
         except:
             return 0
