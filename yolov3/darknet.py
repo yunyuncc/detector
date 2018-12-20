@@ -368,7 +368,7 @@ class Darknet(nn.Module):
         assert(channels == int(self.net_info["channels"]))
         assert(height == int(self.net_info["height"]))
         assert(width == int(self.net_info["width"]))
-        print("input batch is ", batch)
+        #print("input batch is ", batch)
         modules = self.blocks[1:]
         outputs = {} #cache the outputs for the router layer
 
@@ -408,7 +408,7 @@ class Darknet(nn.Module):
                 num_classes = int(module["classes"])
                 #transform
                 x = x.data
-                print("row yolo output:,", x.size())#last lay x.size is torch.Size([1, 255, 52, 52])
+                #print("row yolo output:,", x.size())#last lay x.size is torch.Size([1, 255, 52, 52])
                 #print("predict_transform: input_dim=", input_dim, " anchors=", anchors, " num_classes=", num_classes)
                 x = predict_transform(x, input_dim,anchors, num_classes, CUDA)
                 if not write:

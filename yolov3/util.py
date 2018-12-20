@@ -200,7 +200,7 @@ def prepare_image(img, inp_dim):
     img = cv2.resize(img, (inp_dim, inp_dim))
     img = img[:,:,::-1].transpose((2,0,1)).copy() #BGR->RGB | H W C -> C H W 
     img = torch.from_numpy(img).float().div(255.0).unsqueeze(0)
-    print("prepare_image return size:", img.size())
+    #print("prepare_image return size:", img.size())
     return img
 
 def create_batch(img_list_to_batch, batch_size):

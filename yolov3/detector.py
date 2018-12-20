@@ -95,7 +95,7 @@ assert( inp_dim > 32)
 
 read_dir_time = time.time()
 img_name_list = get_num_img_names(images_dir, 100)
-print("img_name_list:",img_name_list)
+#print("img_name_list:",img_name_list)
 
 
 if not os.path.exists(args.det):
