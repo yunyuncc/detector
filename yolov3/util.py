@@ -91,9 +91,7 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
     #print("call write_wresult, prediction.size=", prediction.size(), " confidence=", confidence,
     #        " num_class=", num_classes, " nms_conf=", nms_conf)
     #将 object_score 小于confidence的全部置为0
-    conf_mask = (prediction[:,:,4] > confidence)
-    conf_mask = conf_mask.float()
-    conf_mask = conf_mask.unsqueeze(2)
+    conf_mask = (prediction[:,:,4] > confidence).float().unsqueeze(2)
     prediction = prediction*conf_mask
     #为了非极大值抑制的计算方便，将bounding box的表示方法作以下转换
     #center_x, center_y, height, width ==> top_left_x, top_left_y, right_bottom_x, right_bottom_y
@@ -135,8 +133,9 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
         for cls in img_classes:
             #perform NMS
             #单次获取每个class的所有的行
-            cls_mask = (image_pred_[:,-1] == cls).float().unsqueeze(1)
-            cls_mask = image_pred_*cls_mask
+            ###cls_mask = (image_pred_[:,-1] == cls).float().unsqueeze(1)
+            ###cls_mask = image_pred_*cls_mask
+            cls_mask = image_pred_*(image_pred_[:,-1] == cls).float().unsqueeze(1)
             class_mask_ind = torch.nonzero(cls_mask[:,-2]).squeeze()
             image_pred_class = image_pred_[class_mask_ind].view(-1,7)
             #print("[",cls,"]image_pred_class=\n", image_pred_class) 
@@ -173,12 +172,12 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
             else:
                 out = torch.cat(seq, 1)
                 output = torch.cat((output, out))
-
-        try:
-            print("write_result output:", output[:,0])
-            return output
-        except:
-            return 0
+    ###fix this bug, 因为没有对齐tab，导致提前退出for循环
+    try:
+        print("write_result output:", output[:,0])
+        return output
+    except:
+        return 0
 
 def letterbox_image(img, inp_dim):
     img_w, img_h = img.shape[1], img.shape[0]

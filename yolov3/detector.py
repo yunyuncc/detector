@@ -25,7 +25,7 @@ def arg_parse():
     parser.add_argument("--bs", dest="bs", help = "Batch size", default = 1)
     parser.add_argument("--confidence", dest="confidence",
                         help="Object confidence to filter predictions",
-                        default=0.6)
+                        default=0.5)
     parser.add_argument("--nms_thesh", dest= "nms_thesh",
                         help="NMS Threshold",
                         default=0.4)
@@ -36,18 +36,6 @@ def arg_parse():
                         help="Input resolution of the network, Increase to increase accuracy",
                         default="416", type=str)
     return parser.parse_args()
-
-def get_img_names(images_path):
-    try:
-        imlist = [osp.join(osp.realpath('.'), images_path, img) for img in os.listdir(images_path)]
-    except NotADirectoryError:
-        print("{} is not a dir".format(images_path))
-        imlist = []
-        imlist.append(osp.join(osp.realpath('.'), images_path))
-    except FileNotFoundError:
-        print("No file or dir with the name {}".format(images_path))
-        exit()
-    return imlist
 
 
 def get_num_img_names(images_path, num):
@@ -63,14 +51,11 @@ def create_model(args, CUDA):
 
     model = Darknet(args.cfgfile)
     model.load_weights(args.weightsfile)
-    print("Network successfully loaded")
     model.net_info["height"] = args.reso
 
     if CUDA:
         #Moves all model parameters and buffers to the GPU.
-        print("setting network to CUDA model......")
         model.cuda()
-        print("use CUDA model success")
     #Sets the module in evaluation mode.
     model.eval()
     return model
@@ -94,9 +79,6 @@ assert( inp_dim > 32)
 read_dir_time = time.time()
 img_name_list = get_num_img_names(images_dir, 100)
 
-print(img_name_list)
-
-
 if not os.path.exists(args.det):
     os.makedirs(args.det)
 
@@ -114,14 +96,12 @@ if CUDA:
 
 #create batches
 img_batches = create_batch(img_batches,batch_size)
-print("len of img_batches=", len(img_batches))
 
 write = False
 start_det_loop_time = time.time()
 
 #分批迭代所有的打包好的img
 for i, batch in enumerate(img_batches):
-    print("################### deal batch ", i)
     start = time.time()
     #1.将图片数据复制到显存中
     if CUDA:
@@ -138,7 +118,6 @@ for i, batch in enumerate(img_batches):
     if type(prediction) == int:
         for img_num, image_name in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
             img_id = i*batch_size + img_num
-            print("img_id-{} image_name-{} has not object detected", img_id, image_name)
         continue
     
     prediction[:,0] += i*batch_size # transform the first attribute from index in mini batch to 
