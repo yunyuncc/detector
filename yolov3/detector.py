@@ -44,7 +44,6 @@ def create_model(args, CUDA):
 
     model = Darknet(args.cfgfile)
     model.load_weights(args.weightsfile)
-    model.net_info["height"] = args.reso
 
     if CUDA:
         #Moves all model parameters and buffers to the GPU.
@@ -64,6 +63,7 @@ CUDA = torch.cuda.is_available()
 num_classes = 80
 classes = load_classes("data/coco.names")
 model = create_model(args, CUDA)
+assert(int(model.net_info["height"]) == int(model.net_info["width"]))
 inp_dim = int(model.net_info["height"])
 assert( inp_dim % 32 == 0)
 assert( inp_dim > 32)
