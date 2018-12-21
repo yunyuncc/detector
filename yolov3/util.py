@@ -194,24 +194,29 @@ def letterbox_image(img, inp_dim):
     return canvas
 
 def load_classes(namesfile):
+    #load all class label
     fp = open(namesfile,"r")
     names = fp.read().split("\n")[:-1]
     return names
 
+
 def prepare_image(img, img_name, inp_dim):
+    #resize image to square and change it to tensor
+
     if img is None:
         raise ValueError("{} data is empty".format(img_name))
     #in blog, just resize
-    #img = cv2.resize(img, (inp_dim, inp_dim))
+    img = cv2.resize(img, (inp_dim, inp_dim))
 
     #in code, add letterbox
-    img = (letterbox_image(img, (inp_dim, inp_dim)))
+    #img = (letterbox_image(img, (inp_dim, inp_dim)))
     img = img[:,:,::-1].transpose((2,0,1)).copy() #BGR->RGB | H W C -> C H W 
     img = torch.from_numpy(img).float().div(255.0).unsqueeze(0)
     #print("prepare_image return size:", img.size())
     return img
 
 def get_num_img_names(images_path, num):
+    #get image from images_path, file name is 1.jpg 2.jpg 3.jpg ......
     img_list = []
     for i in range(num):
         name = "{}.jpg".format(i)
@@ -222,6 +227,7 @@ def get_num_img_names(images_path, num):
 
 
 def create_batch(img_list_to_batch, batch_size):
+    #make image list to some images_batch
     leftover = 0
     if (len(img_list_to_batch) % batch_size):
         leftover = 1
