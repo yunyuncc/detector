@@ -84,9 +84,9 @@ if not os.path.exists(args.det):
 
 load_batch_time = time.time()
 loaded_imgs = [cv2.imread(x) for x in img_name_list]
-
 # change all cv::Mat to Tensor([1, 3, 416, 416]) 
 img_batches = list(map(prepare_image, loaded_imgs, [img_name for img_name in img_name_list],[inp_dim for x in range(len(loaded_imgs))]))
+
 img_dim_list = [(x.shape[1], x.shape[0]) for x in loaded_imgs]
 
 img_dim_list = torch.FloatTensor(img_dim_list).repeat(1,2)
@@ -109,7 +109,6 @@ for i, batch in enumerate(img_batches):
     #2.走前向传播
     with torch.no_grad():
         prediction = model(batch, CUDA)
-        print("batch i=", i, " forward res:", prediction)
     #3.解析前向传播的结果，处理后的prediction的格式为(TODO [index_in_mini_batch,...])
     prediction = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
     end = time.time()
