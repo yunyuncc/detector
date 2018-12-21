@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import cv2
+import os.path as osp
 
 def predict_transform(prediction, input_dim, anchors, num_classes, CUDA = True):
     batch_size = prediction.size(0)
@@ -210,6 +211,16 @@ def prepare_image(img, img_name, inp_dim):
     #print("prepare_image return size:", img.size())
     return img
 
+def get_num_img_names(images_path, num):
+    img_list = []
+    for i in range(num):
+        name = "{}.jpg".format(i)
+        full_file_path = osp.join(osp.realpath('.'), images_path, name)
+        if osp.exists(full_file_path):
+            img_list.append(full_file_path)
+    return img_list
+
+
 def create_batch(img_list_to_batch, batch_size):
     leftover = 0
     if (len(img_list_to_batch) % batch_size):
@@ -219,13 +230,4 @@ def create_batch(img_list_to_batch, batch_size):
         batched_img_list = [torch.cat((img_list_to_batch[i*batch_size : min((i+1)*batch_size, len(img_list_to_batch))])) for i in range(num_batches)]
         return batched_img_list
 
-def to_csv(tensor, file_name):
-    tensor = tensor.view(1, -1)
-    if not (tensor.device == 'cpu'):
-        tensor = tensor.cpu()
-    try:
-        ndata = tensor.numpy()
-    except RuntimeError:
-        ndata = tensor.detach().numpy()
-    np.savetxt(file_name, ndata, delimiter=",")
 

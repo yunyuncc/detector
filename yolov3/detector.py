@@ -7,7 +7,7 @@ import cv2
 from util import *
 import argparse
 import os
-import os.path as osp
+
 from darknet import Darknet
 from darknet import get_test_input
 import pickle as pkl
@@ -38,14 +38,7 @@ def arg_parse():
     return parser.parse_args()
 
 
-def get_num_img_names(images_path, num):
-    img_list = []
-    for i in range(num):
-        name = "{}.jpg".format(i)
-        full_file_path = osp.join(osp.realpath('.'), images_path, name)
-        if osp.exists(full_file_path):
-            img_list.append(full_file_path)
-    return img_list
+
 
 def create_model(args, CUDA):
 
@@ -109,7 +102,8 @@ for i, batch in enumerate(img_batches):
     #2.走前向传播
     with torch.no_grad():
         prediction = model(batch, CUDA)
-    #3.解析前向传播的结果，处理后的prediction的格式为(TODO [index_in_mini_batch,...])
+    #3.解析前向传播的结果，处理后的prediction的格式为:
+    # TODO [index_in_mini_batch,top_left_x, top_left_y, right_bottom_x, right_bottom_y...])
     prediction = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
     end = time.time()
     print("get prediction size:", prediction.size())
@@ -148,8 +142,15 @@ try:
 except NameError:
     print("No detection result")
     exit()
-print("------")
-print(output.size())
-print(output[:,0])
 
-#TODO fix 前向传播的结果不一样
+#将img_dim_list的len 变成和output的len一样长
+img_index = output[:,0].long()
+img_dim_list = torch.index_select(img_dim_list, 0, img_index)
+
+scaling_factor = torch.min(inp_dim/img_dim_list, dim=1, keepdim=True)[0].view(-1, 1)
+print(output[:,[1,2,3,4]] )
+print(img_dim_list)
+output[:,[1,3]] -= (inp_dim - scaling_factor*img_dim_list[:,0].view(-1,1))/2
+output[:,[2,4]] -= (inp_dim - scaling_factor*img_dim_list[:,1].view(-1,1))/2
+
+#[index_in_mini_batch,top_left_x, top_left_y, right_bottom_x, right_bottom_y...]
