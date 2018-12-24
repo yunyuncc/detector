@@ -231,9 +231,9 @@ def create_batch(img_list_to_batch, batch_size):
     leftover = 0
     if (len(img_list_to_batch) % batch_size):
         leftover = 1
-    if batch_size != 1:
-        num_batches = len(img_list_to_batch)//batch_size + leftover
-        batched_img_list = [torch.cat((img_list_to_batch[i*batch_size : min((i+1)*batch_size, len(img_list_to_batch))])) for i in range(num_batches)]
-        return batched_img_list
+
+    num_batches = len(img_list_to_batch)//batch_size + leftover
+    batched_img_list = [torch.cat((img_list_to_batch[i*batch_size : min((i+1)*batch_size, len(img_list_to_batch))])) for i in range(num_batches)]
+    return batched_img_list
 
 
