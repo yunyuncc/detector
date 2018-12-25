@@ -16,10 +16,8 @@ import random
 
 
 def create_model(cfgfile, weightsfile, CUDA):
-
     model = Darknet(cfgfile)
     model.load_weights(weightsfile)
-
     if CUDA:
         #Moves all model parameters and buffers to the GPU.
         model.cuda()
@@ -37,13 +35,13 @@ img_height = 480
 cfgfile = "cfg/yolov3.cfg"
 weightsfile = "weights/yolov3.weights"
 det_dir = "det_dir/"
-start = 0
 CUDA = torch.cuda.is_available()
 num_classes = 80
 classes = load_classes("data/coco.names")
 model = create_model(cfgfile, weightsfile, CUDA)
 assert(int(model.net_info["height"]) == int(model.net_info["width"]))
 inp_dim = int(model.net_info["height"])
+#保证图片可以分割为一个个grad
 assert( inp_dim % 32 == 0)
 assert( inp_dim > 32)
 
@@ -53,28 +51,17 @@ img_name_list = get_num_img_names(images_dir, 500)
 if not os.path.exists(det_dir):
     os.makedirs(det_dir)
 
-load_batch_time = time.time()
 loaded_imgs = [cv2.imread(x) for x in img_name_list]
 # change all cv::Mat to Tensor([1, 3, 416, 416]) 
 img_batches = list(map(prepare_image, loaded_imgs, [img_name for img_name in img_name_list],[inp_dim for x in range(len(loaded_imgs))]))
 
-img_dim_list = [(x.shape[1], x.shape[0]) for x in loaded_imgs]
-
-img_dim_list = torch.FloatTensor(img_dim_list).repeat(1,2)
-
-if CUDA:
-    img_dim_list = img_dim_list.cuda()
-
 #create batches
 img_batches = create_batch(img_batches,batch_size)
 
-write = False
-start_det_loop_time = time.time()
 
 #分批迭代所有的打包好的img
 for i, batch in enumerate(img_batches):
     print("detecting......", i)
-    start = time.time()
     #1.将图片数据复制到显存中
     if CUDA:
         batch = batch.cuda()
