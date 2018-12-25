@@ -55,8 +55,8 @@ def create_model(args, CUDA):
 args = arg_parse()
 images_dir = "/home/wyy/pytorch/my/detector/yolov3/imgs"
 batch_size = 2
-confidence = float(args.confidence)
-nms_thesh = float(args.nms_thesh)
+confidence = 0.7
+nms_thesh = 0.6
 
 img_width = 640
 img_height = 480
