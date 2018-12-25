@@ -54,8 +54,8 @@ def create_model(args, CUDA):
 
 args = arg_parse()
 images_dir = "/home/wyy/pytorch/my/detector/yolov3/imgs"
-batch_size = 3
-confidence = 0.7
+batch_size = 1
+confidence = 0.85
 nms_thesh = 0.6
 
 img_width = 640
@@ -160,20 +160,8 @@ for i, batch in enumerate(img_batches):
                         bottum_right,
                         color,
                         1)
-        cv2.putText(loaded_imgs[img_id],class_label, top_left,cv2.FONT_HERSHEY_PLAIN,1,color, 1)
+        info = "[{}({:.3f})]obj:{:.3f}".format(class_label, class_score, obj_score)
+        cv2.putText(loaded_imgs[img_id],info, top_left,cv2.FONT_HERSHEY_PLAIN,1,color, 1)
     
     cv2.imwrite("{}-detected.jpg".format(i), loaded_imgs[i])
-try:
-    output
-except NameError:
-    print("No detection result")
-    exit()
 
-#将img_dim_list的len 变成和output的len一样长
-img_index = output[:,0].long()
-img_dim_list = torch.index_select(img_dim_list, 0, img_index)
-
-scaling_factor = torch.min(inp_dim/img_dim_list, dim=1, keepdim=True)[0].view(-1, 1)
-print("output.size=", output.size())
-print(output)
-#[index_in_mini_batch,top_left_x, top_left_y, right_bottom_x, right_bottom_y...]
