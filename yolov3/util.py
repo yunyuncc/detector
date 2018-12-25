@@ -89,8 +89,10 @@ def bbox_iou(box1, box2):
     return iou
 
 def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
-    #print("call write_wresult, prediction.size=", prediction.size(), " confidence=", confidence,
-    #        " num_class=", num_classes, " nms_conf=", nms_conf)
+    # 将模型输出的tensor(batch_size * n_before * 85) 转换成可以表示最终detection结果的tensor(n_after*8)
+    # n_before: 在进行非极大值抑制前的一帧当中的detection结果的数量
+    # n_after:  进行非极大值抑制后的batch_size帧当中的detection结果的数量
+
     #将 object_score 小于confidence的全部置为0
     conf_mask = (prediction[:,:,4] > confidence).float().unsqueeze(2)
     prediction = prediction*conf_mask
@@ -108,11 +110,11 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
     for ind in range(batch_size):
         image_pred = prediction[ind]
         #将prediction矩阵的每一行的信息变成如下形式
-        #top-left-x,top-left-y,bottom-right-x,bottom-right-y,max-class-score-index,max-class-score
-        max_class_score_idx, max_class_score = torch.max(image_pred[:,5:5+num_classes], 1)
+        #top-left-x,top-left-y,bottom-right-x,bottom-right-y,object_score,max-class-score,max-class-score-idx
+        max_class_score, max_class_score_idx = torch.max(image_pred[:,5:5+num_classes], 1)
         max_class_score_idx = max_class_score_idx.float().unsqueeze(1)
         max_class_score = max_class_score.float().unsqueeze(1)
-        seq = (image_pred[:,:5], max_class_score_idx, max_class_score)
+        seq = (image_pred[:,:5], max_class_score, max_class_score_idx)
         image_pred = torch.cat(seq,1)
 
         #去掉所有object_score值为0的行
@@ -175,7 +177,7 @@ def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
                 output = torch.cat((output, out))
     ###fix this bug, 因为没有对齐tab，导致提前退出for循环
     try:
-        print("write_result output:", output[:,0])
+        #print("write_result output:", output[:,0])
         return output
     except:
         print("write_write no result")

@@ -54,7 +54,7 @@ def create_model(args, CUDA):
 
 args = arg_parse()
 images_dir = "/home/wyy/pytorch/my/detector/yolov3/imgs"
-batch_size = 2
+batch_size = 3
 confidence = 0.7
 nms_thesh = 0.6
 
@@ -97,6 +97,7 @@ start_det_loop_time = time.time()
 
 #分批迭代所有的打包好的img
 for i, batch in enumerate(img_batches):
+    print("detecting......", i)
     start = time.time()
     #1.将图片数据复制到显存中
     if CUDA:
@@ -105,45 +106,31 @@ for i, batch in enumerate(img_batches):
     with torch.no_grad():
         prediction = model(batch, CUDA)
     #3.解析前向传播的结果，处理后的prediction的格式为:
-    # TODO [index_in_mini_batch,top_left_x, top_left_y, right_bottom_x, right_bottom_y...])
+    # index_in_mini_batch,
+    # top-left-x,
+    # top-left-y,
+    # bottom-right-x,
+    # bottom-right-y,
+    # object_score,
+    # max-class-score,
+    # max-class-score-idx
     prediction = write_results(prediction, confidence, num_classes, nms_conf = nms_thesh)
     end = time.time()
-    print("get prediction size:", prediction.size())
-    #4.显示prediction结果
-    #4.1.没有检测出对象的帧就不跳过，不保存到output里面去
+    #4.prediction为空
     if type(prediction) == int:
-        for img_num, image_name in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
-            img_id = i*batch_size + img_num
+        print("has no detection")
         continue
-    
-    prediction[:,0] += i*batch_size # transform the first attribute from index in mini batch to 
-                                    # index in img_name_list
-    #将bouding box按比例输出
+    #5.将bouding box按转换成比例
     prediction[:,[1,3]] /= int(model.net_info["width"])
     prediction[:,[2,4]] /= int(model.net_info["height"])
-    print("i={}, prediction[:,0]={}".format(i, prediction[:,0]))
 
-    #5.将每个mini_batch的结果都串联到output里面去
-    if not write:
-        output = prediction
-        write = True
-    else:
-        output = torch.cat((output, prediction))
 
-    #6.print出每一帧检测出的物体
-    for img_num, full_image_path in enumerate(img_name_list[i*batch_size: min((i +  1)*batch_size, len(img_name_list))]):
-        img_id = i*batch_size + img_num
-        objs = [classes[int(x[-1])] for x in output if int(x[0]) == img_id]
-        image_name = full_image_path.split("/")[-1]
-        print("------------------img_id {}----------img_name {}------------------------------".format(img_id, image_name))
-        print("{0:20s} predicted in {1:6.3f} seconds".format(image_name, (end - start)/batch_size))
-        print("{0:20s} {1:s}".format("Objects Detected:", " ".join(objs)))
-        print("----------------------------------------------------------")
-    #7.同步等待当前mini_batch中的每个图片都处理完成,因为cuda kernel的调用是异步调用
+    #6.同步等待当前mini_batch中的每个图片都处理完成,因为cuda kernel的调用是异步调用
     if CUDA:
         torch.cuda.synchronize()
 
     rects_tensor = prediction[:,[1,2,3,4]]
+    labels_tensor = prediction[:,[0,5,6,7]]
 
     #处理非法值
     neg_mask = rects_tensor < 0
@@ -156,13 +143,26 @@ for i, batch in enumerate(img_batches):
     rects_tensor[:,[1,3]] *= img_height
 
     rects = rects_tensor.cpu().int().numpy().tolist()
-    for _, rect in enumerate(rects):
-        cv2.rectangle(loaded_imgs[i],
-                        (rect[0],rect[1]), 
-                        (rect[2], rect[3]),
-                        (0,255,0),2)
+    labels = labels_tensor.cpu().numpy().tolist()
+    for k, rect in enumerate(rects):
+        
+        #提取出detection result
+        top_left = (rect[0],rect[1])
+        bottum_right = (rect[2], rect[3])
+        color = (0,255,0)
+        obj_score = labels[k][1]
+        class_score = labels[k][2]
+        class_label = classes[int(labels[k][3])]
+        img_id = i*batch_size + int(labels[k][0])
+
+        cv2.rectangle(loaded_imgs[img_id],
+                        top_left, 
+                        bottum_right,
+                        color,
+                        1)
+        cv2.putText(loaded_imgs[img_id],class_label, top_left,cv2.FONT_HERSHEY_PLAIN,1,color, 1)
     
-    cv2.imwrite("{}-detected.jpg".format(img_id), loaded_imgs[i])
+    cv2.imwrite("{}-detected.jpg".format(i), loaded_imgs[i])
 try:
     output
 except NameError:
@@ -175,5 +175,5 @@ img_dim_list = torch.index_select(img_dim_list, 0, img_index)
 
 scaling_factor = torch.min(inp_dim/img_dim_list, dim=1, keepdim=True)[0].view(-1, 1)
 print("output.size=", output.size())
-print(output[:,[0,1,2,3,4]] )
+print(output)
 #[index_in_mini_batch,top_left_x, top_left_y, right_bottom_x, right_bottom_y...]
