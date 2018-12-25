@@ -14,36 +14,11 @@ import pickle as pkl
 import pandas as pd
 import random
 
-def arg_parse():
-    parser = argparse.ArgumentParser(description='YOLO v3 Detection Module')
-    parser.add_argument("--images", dest = "images", 
-                        help="Image / Directory has images to perform detection upon",
-                        default = "imgs", type = str)
-    parser.add_argument("--det", dest= 'det',
-                        help="Image / Derectory to store detections to",
-                        default = "det", type=str)
-    parser.add_argument("--bs", dest="bs", help = "Batch size", default = 1)
-    parser.add_argument("--confidence", dest="confidence",
-                        help="Object confidence to filter predictions",
-                        default=0.5)
-    parser.add_argument("--nms_thesh", dest= "nms_thesh",
-                        help="NMS Threshold",
-                        default=0.4)
-    parser.add_argument("--cfg", dest = "cfgfile",help="config file", default="cfg/yolov3.cfg", type=str)
-    parser.add_argument("--weights", dest='weightsfile', help="weightsfile",
-                        default='weights/yolov3.weights', type=str)
-    parser.add_argument("--reso", dest='reso', 
-                        help="Input resolution of the network, Increase to increase accuracy",
-                        default="416", type=str)
-    return parser.parse_args()
 
+def create_model(cfgfile, weightsfile, CUDA):
 
-
-
-def create_model(args, CUDA):
-
-    model = Darknet(args.cfgfile)
-    model.load_weights(args.weightsfile)
+    model = Darknet(cfgfile)
+    model.load_weights(weightsfile)
 
     if CUDA:
         #Moves all model parameters and buffers to the GPU.
@@ -52,7 +27,6 @@ def create_model(args, CUDA):
     model.eval()
     return model
 
-args = arg_parse()
 images_dir = "/home/wyy/pytorch/my/detector/yolov3/imgs"
 batch_size = 1
 confidence = 0.85
@@ -60,12 +34,14 @@ nms_thesh = 0.6
 
 img_width = 640
 img_height = 480
-
+cfgfile = "cfg/yolov3.cfg"
+weightsfile = "weights/yolov3.weights"
+det_dir = "det_dir/"
 start = 0
 CUDA = torch.cuda.is_available()
 num_classes = 80
 classes = load_classes("data/coco.names")
-model = create_model(args, CUDA)
+model = create_model(cfgfile, weightsfile, CUDA)
 assert(int(model.net_info["height"]) == int(model.net_info["width"]))
 inp_dim = int(model.net_info["height"])
 assert( inp_dim % 32 == 0)
@@ -74,8 +50,8 @@ assert( inp_dim > 32)
 read_dir_time = time.time()
 img_name_list = get_num_img_names(images_dir, 500)
 
-if not os.path.exists(args.det):
-    os.makedirs(args.det)
+if not os.path.exists(det_dir):
+    os.makedirs(det_dir)
 
 load_batch_time = time.time()
 loaded_imgs = [cv2.imread(x) for x in img_name_list]
@@ -163,5 +139,5 @@ for i, batch in enumerate(img_batches):
         info = "[{}({:.3f})]obj:{:.3f}".format(class_label, class_score, obj_score)
         cv2.putText(loaded_imgs[img_id],info, top_left,cv2.FONT_HERSHEY_PLAIN,1,color, 1)
     
-    cv2.imwrite("{}-detected.jpg".format(i), loaded_imgs[i])
+    cv2.imwrite("{}{}-detected.jpg".format(det_dir,i), loaded_imgs[i])
 
